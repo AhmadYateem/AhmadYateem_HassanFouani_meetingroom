@@ -1,6 +1,5 @@
 """
 MySQL connection utilities with pooled connections.
-Uses mysql-connector-python to maintain a reusable pool across services.
 """
 
 import os
@@ -12,7 +11,7 @@ from mysql.connector import pooling
 
 
 class MySQLConnectionPool:
-    """Lightweight connection pool wrapper for MySQL."""
+    """Connection pool wrapper for MySQL."""
 
     def __init__(
         self,
@@ -52,13 +51,11 @@ def create_pool_from_env(prefix: str = "DATABASE") -> MySQLConnectionPool:
     """
     Build a MySQL connection pool using environment variables.
 
-    Expected variables (with optional prefix):
-    - <PREFIX>_HOST
-    - <PREFIX>_PORT
-    - <PREFIX>_USER
-    - <PREFIX>_PASSWORD
-    - <PREFIX>_NAME
-    - <PREFIX>_POOL_SIZE (optional, defaults to 5)
+    Args:
+        prefix: Environment variable prefix
+
+    Returns:
+        MySQLConnectionPool instance
     """
     host = _load_env_value(f"{prefix}_HOST")
     port = int(_load_env_value(f"{prefix}_PORT", "3306"))
@@ -79,7 +76,15 @@ def create_pool_from_env(prefix: str = "DATABASE") -> MySQLConnectionPool:
 
 @contextmanager
 def get_connection(pool: MySQLConnectionPool):
-    """Yield a pooled MySQL connection."""
+    """
+    Yield a pooled MySQL connection.
+
+    Args:
+        pool: MySQLConnectionPool instance
+
+    Yields:
+        MySQL connection
+    """
     connection = pool.get_connection()
     try:
         yield connection
