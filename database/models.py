@@ -1,372 +1,360 @@
 """
-Database models for the Smart Meeting Room system using MySQL storage.
-Defines Users, Rooms, Bookings, Reviews, and Audit Logs with JSON-backed attributes.
+Lightweight data access layer using mysql-connector.
+Provides dataclass representations and helper functions for common queries.
 """
 
-from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import CheckConstraint, Index, text
-from sqlalchemy.types import JSON
+from __future__ import annotations
 
-db = SQLAlchemy()
+from dataclasses import dataclass, asdict
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional, Sequence
 
-
-class BaseModel(db.Model):
-    """Base model class with common fields and methods."""
-
-    __abstract__ = True
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    def to_dict(self):
-        """Convert model instance to dictionary."""
-        result = {}
-        for column in self.__table__.columns:
-            value = getattr(self, column.name)
-            if isinstance(value, datetime):
-                result[column.name] = value.isoformat()
-            elif isinstance(value, (list, dict)):
-                result[column.name] = value
-            else:
-                result[column.name] = value
-        return result
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.id}>"
+from database.connection import MySQLConnectionPool, get_connection
 
 
-class User(BaseModel):
+def _row_to_dict(cursor, row) -> Dict[str, Any]:
+    """Convert a cursor row to a dict using column names."""
+    columns = [col[0] for col in cursor.description]
+    return dict(zip(columns, row))
+
+
+@dataclass
+class User:
+    id: Optional[int]
+    username: str
+    email: str
+    password_hash: str
+    full_name: str
+    role: str = "user"
+    is_active: bool = True
+    last_login: Optional[datetime] = None
+    failed_login_attempts: int = 0
+    locked_until: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @staticmethod
+    def from_row(cursor, row) -> "User":
+        data = _row_to_dict(cursor, row)
+        return User(**data)
+
+
+@dataclass
+class Room:
+    id: Optional[int]
+    name: str
+    capacity: int
+    floor: Optional[int] = None
+    building: Optional[str] = None
+    location: Optional[str] = None
+    equipment: Optional[Any] = None
+    amenities: Optional[Any] = None
+    status: str = "available"
+    hourly_rate: Optional[float] = None
+    image_url: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @staticmethod
+    def from_row(cursor, row) -> "Room":
+        data = _row_to_dict(cursor, row)
+        return Room(**data)
+
+
+@dataclass
+class Booking:
+    id: Optional[int]
+    user_id: int
+    room_id: int
+    title: str
+    description: Optional[str]
+    start_time: datetime
+    end_time: datetime
+    status: str = "confirmed"
+    attendees: Optional[int] = None
+    is_recurring: bool = False
+    recurrence_pattern: Optional[str] = None
+    recurrence_end_date: Optional[date] = None
+    cancellation_reason: Optional[str] = None
+    cancelled_at: Optional[datetime] = None
+    cancelled_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @staticmethod
+    def from_row(cursor, row) -> "Booking":
+        data = _row_to_dict(cursor, row)
+        return Booking(**data)
+
+
+@dataclass
+class Review:
+    id: Optional[int]
+    user_id: int
+    room_id: int
+    booking_id: Optional[int]
+    rating: int
+    title: Optional[str] = None
+    comment: Optional[str] = None
+    pros: Optional[str] = None
+    cons: Optional[str] = None
+    is_flagged: bool = False
+    flag_reason: Optional[str] = None
+    flagged_by: Optional[int] = None
+    flagged_at: Optional[datetime] = None
+    is_hidden: bool = False
+    hidden_reason: Optional[str] = None
+    helpful_count: int = 0
+    unhelpful_count: int = 0
+    edited_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @staticmethod
+    def from_row(cursor, row) -> "Review":
+        data = _row_to_dict(cursor, row)
+        return Review(**data)
+
+
+@dataclass
+class AuditLog:
+    id: Optional[int]
+    user_id: Optional[int]
+    service: str
+    action: str
+    resource_type: Optional[str] = None
+    resource_id: Optional[int] = None
+    old_values: Optional[Any] = None
+    new_values: Optional[Any] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    success: bool = True
+    error_message: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @staticmethod
+    def from_row(cursor, row) -> "AuditLog":
+        data = _row_to_dict(cursor, row)
+        return AuditLog(**data)
+
+
+# --- User queries ---
+
+def create_user(pool: MySQLConnectionPool, user: User) -> int:
+    query = """
+    INSERT INTO users (username, email, password_hash, full_name, role, is_active, last_login,
+                       failed_login_attempts, locked_until)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
-    User model for authentication and user management.
-
-    Attributes:
-        username: Unique username for login
-        email: Unique email address
-        password_hash: Hashed password
-        full_name: User's full name
-        role: User role (admin, user, facility_manager, moderator, auditor, service)
-        is_active: Whether the account is active
-        last_login: Timestamp of last successful login
-        failed_login_attempts: Number of consecutive failed login attempts
-        locked_until: Timestamp until which the account is locked
-    """
-
-    __tablename__ = 'users'
-
-    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(100), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    full_name = db.Column(db.String(100), nullable=False)
-    role = db.Column(
-        db.String(20),
-        nullable=False,
-        default='user',
-        server_default=text("'user'")
+    params = (
+        user.username,
+        user.email,
+        user.password_hash,
+        user.full_name,
+        user.role,
+        user.is_active,
+        user.last_login,
+        user.failed_login_attempts,
+        user.locked_until,
     )
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    last_login = db.Column(db.DateTime)
-    failed_login_attempts = db.Column(db.Integer, default=0, nullable=False)
-    locked_until = db.Column(db.DateTime)
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        user_id = cur.lastrowid
+        cur.close()
+    return user_id
 
-    bookings = db.relationship('Booking', back_populates='user', lazy='dynamic', foreign_keys='Booking.user_id')
-    reviews = db.relationship('Review', back_populates='user', lazy='dynamic', foreign_keys='Review.user_id')
-    flagged_reviews = db.relationship('Review', back_populates='flagger', lazy='dynamic', foreign_keys='Review.flagged_by')
-    cancelled_bookings = db.relationship('Booking', back_populates='canceller', lazy='dynamic', foreign_keys='Booking.cancelled_by')
 
-    __table_args__ = (
-        CheckConstraint(
-            "role IN ('admin', 'user', 'facility_manager', 'moderator', 'auditor', 'service')",
-            name='check_user_role'
-        ),
-        Index('idx_users_username', 'username'),
-        Index('idx_users_email', 'email'),
-        Index('idx_users_role', 'role'),
+def get_user_by_email(pool: MySQLConnectionPool, email: str) -> Optional[User]:
+    query = "SELECT * FROM users WHERE email = %s"
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, (email,))
+        row = cur.fetchone()
+        result = User.from_row(cur, row) if row else None
+        cur.close()
+    return result
+
+
+# --- Room queries ---
+
+def list_rooms(pool: MySQLConnectionPool, status: Optional[str] = None) -> List[Room]:
+    query = "SELECT * FROM rooms"
+    params: Sequence[Any] = ()
+    if status:
+        query += " WHERE status = %s"
+        params = (status,)
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        results = [Room.from_row(cur, row) for row in rows]
+        cur.close()
+    return results
+
+
+def create_room(pool: MySQLConnectionPool, room: Room) -> int:
+    query = """
+    INSERT INTO rooms (name, capacity, floor, building, location, equipment, amenities,
+                       status, hourly_rate, image_url)
+    VALUES (%s, %s, %s, %s, %s, CAST(%s AS JSON), CAST(%s AS JSON), %s, %s, %s)
+    """
+    params = (
+        room.name,
+        room.capacity,
+        room.floor,
+        room.building,
+        room.location,
+        room.equipment or "[]",
+        room.amenities or "[]",
+        room.status,
+        room.hourly_rate,
+        room.image_url,
     )
-
-    def is_locked(self):
-        """Check if user account is currently locked."""
-        if self.locked_until is None:
-            return False
-        return datetime.utcnow() < self.locked_until
-
-    def has_role(self, *roles):
-        """Check if user has any of the specified roles."""
-        return self.role in roles
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        room_id = cur.lastrowid
+        cur.close()
+    return room_id
 
 
-class Room(BaseModel):
+# --- Booking queries ---
+
+def check_booking_conflict(
+    pool: MySQLConnectionPool,
+    room_id: int,
+    start_time: datetime,
+    end_time: datetime,
+    exclude_booking_id: Optional[int] = None,
+) -> bool:
+    query = """
+    SELECT 1 FROM bookings
+    WHERE room_id = %s
+      AND status IN ('pending', 'confirmed')
+      AND (
+           (start_time <= %s AND end_time > %s)
+        OR (start_time < %s AND end_time >= %s)
+        OR (start_time >= %s AND end_time <= %s)
+      )
     """
-    Room model for meeting room management.
+    params: List[Any] = [room_id, start_time, start_time, end_time, end_time, start_time, end_time]
+    if exclude_booking_id:
+        query += " AND id <> %s"
+        params.append(exclude_booking_id)
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, tuple(params))
+        conflict = cur.fetchone() is not None
+        cur.close()
+    return conflict
 
-    Attributes:
-        name: Unique room name
-        capacity: Maximum number of people
-        floor: Floor number
-        building: Building name
-        location: Detailed location description
-        equipment: JSON list of available equipment
-        amenities: JSON list of amenities
-        status: Current room status (available, booked, maintenance, out_of_service)
-        hourly_rate: Cost per hour for booking
-        image_url: URL to room image
-    """
 
-    __tablename__ = 'rooms'
-
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    capacity = db.Column(db.Integer, nullable=False)
-    floor = db.Column(db.Integer)
-    building = db.Column(db.String(50))
-    location = db.Column(db.String(200))
-    equipment = db.Column(JSON, default=list)
-    amenities = db.Column(JSON, default=list)
-    status = db.Column(
-        db.String(20),
-        default='available',
-        nullable=False
+def create_booking(pool: MySQLConnectionPool, booking: Booking) -> int:
+    query = """
+    INSERT INTO bookings (
+        user_id, room_id, title, description, start_time, end_time, status, attendees,
+        is_recurring, recurrence_pattern, recurrence_end_date, cancellation_reason,
+        cancelled_at, cancelled_by
     )
-    hourly_rate = db.Column(db.Numeric(10, 2))
-    image_url = db.Column(db.String(500))
-
-    bookings = db.relationship('Booking', back_populates='room', lazy='dynamic')
-    reviews = db.relationship('Review', back_populates='room', lazy='dynamic')
-
-    __table_args__ = (
-        CheckConstraint('capacity > 0', name='check_room_capacity'),
-        CheckConstraint(
-            "status IN ('available', 'booked', 'maintenance', 'out_of_service')",
-            name='check_room_status'
-        ),
-        Index('idx_rooms_capacity', 'capacity'),
-        Index('idx_rooms_status', 'status'),
-        Index('idx_rooms_location', 'location'),
-        Index('idx_rooms_building', 'building'),
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    params = (
+        booking.user_id,
+        booking.room_id,
+        booking.title,
+        booking.description,
+        booking.start_time,
+        booking.end_time,
+        booking.status,
+        booking.attendees,
+        booking.is_recurring,
+        booking.recurrence_pattern,
+        booking.recurrence_end_date,
+        booking.cancellation_reason,
+        booking.cancelled_at,
+        booking.cancelled_by,
     )
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        booking_id = cur.lastrowid
+        cur.close()
+    return booking_id
 
-    def is_available(self):
-        """Check if room is available for booking."""
-        return self.status == 'available'
 
+# --- Review queries ---
 
-class Booking(BaseModel):
-    """
-    Booking model for meeting room reservations.
-
-    Attributes:
-        user_id: ID of user who made the booking
-        room_id: ID of booked room
-        title: Booking title/subject
-        description: Detailed description
-        start_time: Booking start time
-        end_time: Booking end time
-        status: Booking status (pending, confirmed, cancelled, completed, no_show)
-        attendees: Number of expected attendees
-        is_recurring: Whether this is a recurring booking
-        recurrence_pattern: Pattern for recurring bookings (daily, weekly, monthly)
-        recurrence_end_date: End date for recurring bookings
-        cancellation_reason: Reason for cancellation
-        cancelled_at: Timestamp of cancellation
-        cancelled_by: ID of user who cancelled
-    """
-
-    __tablename__ = 'bookings'
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    room_id = db.Column(db.Integer, db.ForeignKey('rooms.id', ondelete='CASCADE'), nullable=False)
-    title = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text)
-    start_time = db.Column(db.DateTime, nullable=False, index=True)
-    end_time = db.Column(db.DateTime, nullable=False, index=True)
-    status = db.Column(
-        db.String(20),
-        default='confirmed',
-        nullable=False
+def create_review(pool: MySQLConnectionPool, review: Review) -> int:
+    query = """
+    INSERT INTO reviews (
+        user_id, room_id, booking_id, rating, title, comment, pros, cons,
+        is_flagged, flag_reason, flagged_by, flagged_at,
+        is_hidden, hidden_reason, helpful_count, unhelpful_count, edited_at
     )
-    attendees = db.Column(db.Integer)
-    is_recurring = db.Column(db.Boolean, default=False, nullable=False)
-    recurrence_pattern = db.Column(db.String(20))
-    recurrence_end_date = db.Column(db.Date)
-    cancellation_reason = db.Column(db.Text)
-    cancelled_at = db.Column(db.DateTime)
-    cancelled_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-
-    user = db.relationship('User', back_populates='bookings', foreign_keys=[user_id])
-    room = db.relationship('Room', back_populates='bookings')
-    reviews = db.relationship('Review', back_populates='booking', lazy='dynamic')
-    canceller = db.relationship('User', back_populates='cancelled_bookings', foreign_keys=[cancelled_by])
-
-    __table_args__ = (
-        CheckConstraint('end_time > start_time', name='check_booking_times'),
-        CheckConstraint(
-            "status IN ('pending', 'confirmed', 'cancelled', 'completed', 'no_show')",
-            name='check_booking_status'
-        ),
-        CheckConstraint(
-            "recurrence_pattern IS NULL OR recurrence_pattern IN ('daily', 'weekly', 'monthly')",
-            name='check_recurrence_pattern'
-        ),
-        Index('idx_bookings_user_id', 'user_id'),
-        Index('idx_bookings_room_id', 'room_id'),
-        Index('idx_bookings_start_time', 'start_time'),
-        Index('idx_bookings_end_time', 'end_time'),
-        Index('idx_bookings_status', 'status'),
-        Index('idx_bookings_date_range', 'start_time', 'end_time'),
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    params = (
+        review.user_id,
+        review.room_id,
+        review.booking_id,
+        review.rating,
+        review.title,
+        review.comment,
+        review.pros,
+        review.cons,
+        review.is_flagged,
+        review.flag_reason,
+        review.flagged_by,
+        review.flagged_at,
+        review.is_hidden,
+        review.hidden_reason,
+        review.helpful_count,
+        review.unhelpful_count,
+        review.edited_at,
     )
-
-    def has_conflict(self, room_id, start_time, end_time, exclude_booking_id=None):
-        """
-        Check if booking conflicts with existing bookings.
-
-        Args:
-            room_id: Room ID to check
-            start_time: Start time of new booking
-            end_time: End time of new booking
-            exclude_booking_id: Booking ID to exclude from check (for updates)
-
-        Returns:
-            Boolean indicating if conflict exists
-        """
-        query = Booking.query.filter(
-            Booking.room_id == room_id,
-            Booking.status.in_(['pending', 'confirmed']),
-            db.or_(
-                db.and_(Booking.start_time <= start_time, Booking.end_time > start_time),
-                db.and_(Booking.start_time < end_time, Booking.end_time >= end_time),
-                db.and_(Booking.start_time >= start_time, Booking.end_time <= end_time)
-            )
-        )
-
-        if exclude_booking_id:
-            query = query.filter(Booking.id != exclude_booking_id)
-
-        return query.first() is not None
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        review_id = cur.lastrowid
+        cur.close()
+    return review_id
 
 
-class Review(BaseModel):
-    """
-    Review model for room feedback and ratings.
+# --- Audit log queries ---
 
-    Attributes:
-        user_id: ID of user who submitted review
-        room_id: ID of reviewed room
-        booking_id: ID of booking being reviewed
-        rating: Rating from 1-5
-        title: Review title
-        comment: Review comment/description
-        pros: Positive aspects
-        cons: Negative aspects
-        is_flagged: Whether review has been flagged
-        flag_reason: Reason for flagging
-        flagged_by: ID of user who flagged
-        flagged_at: Timestamp of flagging
-        is_hidden: Whether review is hidden by moderators
-        hidden_reason: Reason for hiding
-        helpful_count: Number of helpful votes
-        unhelpful_count: Number of unhelpful votes
-        edited_at: Timestamp of last edit
-    """
-
-    __tablename__ = 'reviews'
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    room_id = db.Column(db.Integer, db.ForeignKey('rooms.id', ondelete='CASCADE'), nullable=False)
-    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id', ondelete='CASCADE'))
-    rating = db.Column(db.Integer, nullable=False)
-    title = db.Column(db.String(200))
-    comment = db.Column(db.Text)
-    pros = db.Column(db.Text)
-    cons = db.Column(db.Text)
-    is_flagged = db.Column(db.Boolean, default=False, nullable=False)
-    flag_reason = db.Column(db.String(200))
-    flagged_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    flagged_at = db.Column(db.DateTime)
-    is_hidden = db.Column(db.Boolean, default=False, nullable=False)
-    hidden_reason = db.Column(db.String(200))
-    helpful_count = db.Column(db.Integer, default=0, nullable=False)
-    unhelpful_count = db.Column(db.Integer, default=0, nullable=False)
-    edited_at = db.Column(db.DateTime)
-
-    user = db.relationship('User', back_populates='reviews', foreign_keys=[user_id])
-    room = db.relationship('Room', back_populates='reviews')
-    booking = db.relationship('Booking', back_populates='reviews')
-    flagger = db.relationship('User', back_populates='flagged_reviews', foreign_keys=[flagged_by])
-
-    __table_args__ = (
-        CheckConstraint('rating >= 1 AND rating <= 5', name='check_review_rating'),
-        db.UniqueConstraint('user_id', 'booking_id', name='unique_user_booking_review'),
-        Index('idx_reviews_room_id', 'room_id'),
-        Index('idx_reviews_user_id', 'user_id'),
-        Index('idx_reviews_rating', 'rating'),
-        Index('idx_reviews_flagged', 'is_flagged'),
-        Index('idx_reviews_hidden', 'is_hidden'),
+def add_audit_log(pool: MySQLConnectionPool, log: AuditLog) -> int:
+    query = """
+    INSERT INTO audit_logs (
+        user_id, service, action, resource_type, resource_id,
+        old_values, new_values, ip_address, user_agent,
+        success, error_message
     )
-
-
-class AuditLog(BaseModel):
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
-    Audit log model for tracking system changes and actions.
-
-    Attributes:
-        user_id: ID of user who performed action
-        service: Service name where action occurred
-        action: Action performed
-        resource_type: Type of resource affected
-        resource_id: ID of affected resource
-        old_values: Previous values (JSON)
-        new_values: New values (JSON)
-        ip_address: IP address of requester
-        user_agent: User agent string
-        success: Whether action was successful
-        error_message: Error message if action failed
-    """
-
-    __tablename__ = 'audit_logs'
-
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
-    service = db.Column(db.String(50), nullable=False)
-    action = db.Column(db.String(50), nullable=False)
-    resource_type = db.Column(db.String(50))
-    resource_id = db.Column(db.Integer)
-    old_values = db.Column(JSON)
-    new_values = db.Column(JSON)
-    ip_address = db.Column(db.String(45))
-    user_agent = db.Column(db.Text)
-    success = db.Column(db.Boolean, default=True, nullable=False)
-    error_message = db.Column(db.Text)
-
-    user = db.relationship('User', backref='audit_logs')
-
-    __table_args__ = (
-        Index('idx_audit_logs_user_id', 'user_id'),
-        Index('idx_audit_logs_service', 'service'),
-        Index('idx_audit_logs_action', 'action'),
-        Index('idx_audit_logs_created_at', 'created_at'),
-        Index('idx_audit_logs_resource', 'resource_type', 'resource_id'),
+    params = (
+        log.user_id,
+        log.service,
+        log.action,
+        log.resource_type,
+        log.resource_id,
+        log.old_values,
+        log.new_values,
+        log.ip_address,
+        log.user_agent,
+        log.success,
+        log.error_message,
     )
+    with get_connection(pool) as conn:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        log_id = cur.lastrowid
+        cur.close()
+    return log_id
 
 
-def init_db(app):
-    """
-    Initialize database with Flask app.
+# Utility to convert dataclasses to dictionaries
 
-    Args:
-        app: Flask application instance
-    """
-    db.init_app(app)
-
-    with app.app_context():
-        db.create_all()
-
-
-def reset_db(app):
-    """
-    Reset database (drop all tables and recreate).
-
-    Args:
-        app: Flask application instance
-    """
-    with app.app_context():
-        db.drop_all()
-        db.create_all()
+def to_dict(instance) -> Dict[str, Any]:
+    return asdict(instance)
