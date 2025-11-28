@@ -121,12 +121,13 @@ def create_booking():
     data = request.get_json()
     current_user_id = get_jwt_identity()
     
-    validate_required_fields(data, ['room_id', 'title', 'start_time', 'end_time', 'attendees'])
+    validate_required_fields(data, ['room_id', 'title', 'start_time', 'end_time'])
     
     room_id = validate_positive_integer(data.get('room_id'), 'room_id')
     title = sanitize_string(data.get('title'))
     description = sanitize_html(data.get('description', ''))
-    attendees = validate_positive_integer(data.get('attendees'), 'attendees')
+    attendees = validate_positive_integer(data.get('attendees', 1), 'attendees')
+    force = bool(data.get('force', False))
     
     validate_string_length(title, 'title', min_length=3, max_length=200)
     validate_string_length(description, 'description', max_length=1000)
@@ -142,7 +143,15 @@ def create_booking():
         if not dao.room_exists(connection, room_id):
             return not_found_response('Room')
 
-        is_available = dao.check_availability(connection, room_id, start_time, end_time)
+        # Admins or facility managers may use `force=True` to override conflicts
+        if force:
+            claims = get_jwt()
+            user_role = claims.get('role', 'user')
+            if user_role not in ['admin', 'facility_manager']:
+                return error_response('Only admins/facility managers can force bookings', status_code=403)
+            is_available = True
+        else:
+            is_available = dao.check_availability(connection, room_id, start_time, end_time)
         
         if not is_available:
             conflicts = dao.get_conflicts(connection, room_id, start_time, end_time)
@@ -390,13 +399,14 @@ def create_recurring_booking():
     
     validate_required_fields(data, [
         'room_id', 'title', 'start_time', 'end_time', 
-        'attendees', 'pattern', 'end_date'
+        'pattern', 'end_date'
     ])
     
     room_id = validate_positive_integer(data.get('room_id'), 'room_id')
     title = sanitize_string(data.get('title'))
     description = sanitize_html(data.get('description', ''))
-    attendees = validate_positive_integer(data.get('attendees'), 'attendees')
+    attendees = validate_positive_integer(data.get('attendees', 1), 'attendees')
+    force = bool(data.get('force', False))
     
     validate_string_length(title, 'title', min_length=3, max_length=200)
     validate_string_length(description, 'description', max_length=1000)
@@ -420,18 +430,38 @@ def create_recurring_booking():
         if not dao.room_exists(connection, room_id):
             return not_found_response('Room')
 
-        booking_ids = dao.create_recurring_bookings(
-            connection,
-            user_id=current_user_id,
-            room_id=room_id,
-            title=title,
-            description=description,
-            start_time=start_time,
-            end_time=end_time,
-            attendees=attendees,
-            pattern=pattern,
-            end_date=end_date
-        )
+        # If `force` is True, require admin/facility_manager role and bypass availability checks
+        if force:
+            claims = get_jwt()
+            user_role = claims.get('role', 'user')
+            if user_role not in ['admin', 'facility_manager']:
+                return error_response('Only admins/facility managers can force bookings', status_code=403)
+            booking_ids = dao.create_recurring_bookings(
+                connection,
+                user_id=current_user_id,
+                room_id=room_id,
+                title=title,
+                description=description,
+                start_time=start_time,
+                end_time=end_time,
+                attendees=attendees,
+                pattern=pattern,
+                end_date=end_date,
+                force=True
+            )
+        else:
+            booking_ids = dao.create_recurring_bookings(
+                connection,
+                user_id=current_user_id,
+                room_id=room_id,
+                title=title,
+                description=description,
+                start_time=start_time,
+                end_time=end_time,
+                attendees=attendees,
+                pattern=pattern,
+                end_date=end_date
+            )
     
     return success_response({
         'booking_ids': booking_ids,

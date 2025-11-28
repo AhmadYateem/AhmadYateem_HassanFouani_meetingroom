@@ -7,12 +7,8 @@ Author: Ahmad Yateem
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from utils.exceptions import ValidationError
 from email_validator import validate_email, EmailNotValidError
-
-
-class ValidationError(Exception):
-    """Custom exception for validation errors."""
-    pass
 
 
 def validate_required_fields(data: Dict, required_fields: List[str]) -> None:

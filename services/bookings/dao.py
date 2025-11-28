@@ -427,7 +427,7 @@ def get_conflicts(connection, room_id: int, start_time: datetime,
 def create_recurring_bookings(connection, user_id: int, room_id: int, 
                               title: str, description: str, start_time: datetime,
                               end_time: datetime, attendees: int, 
-                              pattern: str, end_date: datetime) -> List[int]:
+                              pattern: str, end_date: datetime, force: bool = False) -> List[int]:
     """
     Create recurring bookings.
 
@@ -454,7 +454,10 @@ def create_recurring_bookings(connection, user_id: int, room_id: int,
     cursor = connection.cursor()
     
     while current_start <= end_date:
-        if check_availability(connection, room_id, current_start, current_end):
+        should_create = True
+        if not force and not check_availability(connection, room_id, current_start, current_end):
+            should_create = False
+        if should_create:
             query = """
                 INSERT INTO bookings (user_id, room_id, title, description, 
                                      start_time, end_time, status, attendees,
