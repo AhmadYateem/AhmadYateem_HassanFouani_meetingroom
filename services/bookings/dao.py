@@ -9,10 +9,20 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 
 
-def create_booking(connection, user_id: int, room_id: int, title: str, 
+def room_exists(connection, room_id: int) -> bool:
+    """Return True when a room with the provided id exists."""
+    cursor = connection.cursor()
+    cursor.execute("SELECT 1 FROM rooms WHERE id = %s LIMIT 1", (room_id,))
+    exists = cursor.fetchone() is not None
+    cursor.close()
+    return exists
+
+
+def create_booking(connection, user_id: int, room_id: int, title: str,
                    description: str, start_time: datetime, end_time: datetime,
-                   attendees: int, is_recurring: bool = False, 
-                   recurrence_pattern: str = None, recurrence_end_date: datetime = None) -> int:
+                   attendees: int, is_recurring: bool = False,
+                   recurrence_pattern: Optional[str] = None,
+                   recurrence_end_date: Optional[datetime] = None) -> int:
     """
     Create a new booking.
 
@@ -34,14 +44,28 @@ def create_booking(connection, user_id: int, room_id: int, title: str,
     """
     cursor = connection.cursor()
     query = """
-        INSERT INTO bookings (user_id, room_id, title, description, start_time, 
-                             end_time, status, attendees, is_recurring, 
-                             recurrence_pattern, recurrence_end_date, created_at, updated_at)
+        INSERT INTO bookings (
+            user_id, room_id, title, description, start_time,
+            end_time, status, attendees, is_recurring,
+            recurrence_pattern, recurrence_end_date, created_at, updated_at
+        )
         VALUES (%s, %s, %s, %s, %s, %s, 'confirmed', %s, %s, %s, %s, NOW(), NOW())
     """
-    cursor.execute(query, (user_id, room_id, title, description, start_time, 
-                          end_time, attendees, is_recurring, recurrence_pattern, 
-                          recurrence_end_date))
+    cursor.execute(
+        query,
+        (
+            user_id,
+            room_id,
+            title,
+            description,
+            start_time,
+            end_time,
+            attendees,
+            is_recurring,
+            recurrence_pattern,
+            recurrence_end_date,
+        ),
+    )
     connection.commit()
     booking_id = cursor.lastrowid
     cursor.close()

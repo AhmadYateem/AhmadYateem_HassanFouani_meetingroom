@@ -177,7 +177,7 @@ class SimpleRateLimiter:
 rate_limiter = SimpleRateLimiter()
 
 
-def rate_limit(limit: int = 60, window: int = 60, key_func=None):
+def rate_limit(limit: int = 60, window: int = 60, key_func=None, **legacy_kwargs):
     """
     Decorator to apply rate limiting to routes.
 
@@ -189,6 +189,11 @@ def rate_limit(limit: int = 60, window: int = 60, key_func=None):
     Returns:
         Decorated function
     """
+    if 'max_calls' in legacy_kwargs:
+        limit = legacy_kwargs['max_calls']
+    if 'time_window' in legacy_kwargs:
+        window = legacy_kwargs['time_window']
+
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):

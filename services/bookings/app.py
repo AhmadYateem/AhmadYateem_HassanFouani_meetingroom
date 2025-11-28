@@ -12,7 +12,7 @@ from prometheus_flask_exporter import PrometheusMetrics
 
 from configs.config import DevelopmentConfig
 from database.connection import create_pool_from_env
-from .routes import bookings_bp
+from services.bookings.routes import bookings_bp
 
 
 def create_app(config_class=DevelopmentConfig):

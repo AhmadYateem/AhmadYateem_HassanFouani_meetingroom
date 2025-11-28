@@ -20,7 +20,7 @@ from utils.responses import (
 )
 from utils.decorators import handle_errors, rate_limit
 from utils.exceptions import ValidationError, NotFoundError, ConflictError
-from . import dao
+from services.bookings import dao
 
 
 bookings_bp = Blueprint('bookings', __name__)
@@ -139,6 +139,9 @@ def create_booking():
     db_pool = current_app.config['DB_POOL']
     
     with db_pool.get_connection() as connection:
+        if not dao.room_exists(connection, room_id):
+            return not_found_response('Room')
+
         is_available = dao.check_availability(connection, room_id, start_time, end_time)
         
         if not is_available:
@@ -414,6 +417,9 @@ def create_recurring_booking():
     db_pool = current_app.config['DB_POOL']
     
     with db_pool.get_connection() as connection:
+        if not dao.room_exists(connection, room_id):
+            return not_found_response('Room')
+
         booking_ids = dao.create_recurring_bookings(
             connection,
             user_id=current_user_id,
@@ -435,7 +441,7 @@ def create_recurring_booking():
 
 
 @bookings_bp.route('/api/bookings/availability-matrix', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 @handle_errors
 @rate_limit(max_calls=50, time_window=60)
 def get_availability_matrix():

@@ -382,7 +382,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Ahmad K. Yateem\",\n  \"email\": \"ahmadyateem@mail.aub.edu\"\n}"
+              "raw": "{\n  \"name\": \"Ahmad A. Yateem\",\n  \"email\": \"ahmadyateem@mail.aub.edu\"\n}"
             },
             "url": {
               "raw": "http://localhost:5001/api/users/{{user_id}}",

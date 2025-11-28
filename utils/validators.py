@@ -150,6 +150,22 @@ def validate_room_status(status: str) -> None:
         raise ValidationError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
 
 
+def validate_positive_integer(value: Any, field_name: str) -> int:
+    """Ensure a field is a positive integer."""
+    if isinstance(value, bool):
+        raise ValidationError(f"{field_name} must be a positive integer")
+
+    try:
+        value_int = int(value)
+    except (TypeError, ValueError):
+        raise ValidationError(f"{field_name} must be a positive integer")
+
+    if value_int <= 0:
+        raise ValidationError(f"{field_name} must be greater than 0")
+
+    return value_int
+
+
 def validate_booking_times(start_time: datetime, end_time: datetime) -> None:
     """
     Validate booking start and end times.
@@ -193,6 +209,26 @@ def validate_booking_status(status: str) -> None:
 
     if status not in valid_statuses:
         raise ValidationError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+
+
+def validate_string_length(value: Optional[str], field_name: str,
+                           min_length: int = None, max_length: int = None) -> Optional[str]:
+    """Validate that a string falls within the expected length bounds."""
+    if value is None:
+        return value
+
+    if not isinstance(value, str):
+        raise ValidationError(f"{field_name} must be a string")
+
+    length = len(value)
+
+    if min_length is not None and length < min_length:
+        raise ValidationError(f"{field_name} must be at least {min_length} characters long")
+
+    if max_length is not None and length > max_length:
+        raise ValidationError(f"{field_name} must not exceed {max_length} characters")
+
+    return value
 
 
 def validate_rating(rating: int) -> None:
@@ -256,6 +292,20 @@ def validate_date_format(date_string: str) -> datetime:
         return datetime.fromisoformat(date_string.replace('Z', '+00:00'))
     except (ValueError, AttributeError):
         raise ValidationError("Invalid date format. Use ISO 8601 format (YYYY-MM-DDTHH:MM:SS)")
+
+
+def validate_datetime(value: Any, field_name: str = "datetime") -> datetime:
+    """Validate and convert inputs into a datetime object."""
+    if isinstance(value, datetime):
+        return value
+
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError:
+            raise ValidationError(f"{field_name} must be a valid ISO 8601 datetime string")
+
+    raise ValidationError(f"{field_name} must be a valid datetime string")
 
 
 def validate_pagination_params(page: int, per_page: int) -> None:

@@ -205,6 +205,20 @@ def conflict_response(message: str = "Resource conflict"):
     }), 409
 
 
+def conflict_error_response(message: str, details: Optional[Dict[str, Any]] = None,
+                            status_code: int = 409):
+    """Return rich conflict response when extra context helps clients resolve it."""
+    response = {
+        'success': False,
+        'error': message
+    }
+
+    if details:
+        response['details'] = details
+
+    return jsonify(response), status_code
+
+
 def rate_limit_response(message: str = "Rate limit exceeded", retry_after: int = None):
     """
     Create 429 Too Many Requests response.
