@@ -269,7 +269,7 @@ def delete_booking(booking_id):
     Returns:
         Success message
     """
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     current_user_id = get_jwt_identity()
     claims = get_jwt()
     user_role = claims.get('role', 'user')
@@ -471,6 +471,7 @@ def create_recurring_booking():
 
 
 @bookings_bp.route('/api/bookings/availability-matrix', methods=['GET'])
+@bookings_bp.route('/api/bookings/availability', methods=['GET'])
 @jwt_required(optional=True)
 @handle_errors
 @rate_limit(max_calls=50, time_window=60)
@@ -499,3 +500,34 @@ def get_availability_matrix():
         'date': date.date().isoformat(),
         'availability': availability
     })
+
+@bookings_bp.route('/api/bookings/user/<int:user_id>', methods=['GET'])
+@jwt_required()
+@handle_errors
+@rate_limit(max_calls=50, time_window=60)
+def get_user_bookings_route(user_id):
+    """
+    Get a user's bookings. Admins may fetch any user's bookings; normal users
+    can only fetch their own.
+
+    Returns:
+        List of bookings (paginated)
+    """
+    current_user_id = get_jwt_identity()
+    claims = get_jwt()
+    user_role = claims.get('role', 'user')
+
+    # Only admins can list another user's bookings
+    if current_user_id != user_id and user_role != 'admin':
+        return error_response('Unauthorized to view this user\'s bookings', status_code=403)
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    offset = (page - 1) * per_page
+
+    db_pool = current_app.config['DB_POOL']
+    with db_pool.get_connection() as connection:
+        bookings = dao.get_user_bookings(connection, user_id, limit=per_page, offset=offset)
+        total = dao.count_bookings(connection, user_id=user_id)
+
+    return paginated_response(bookings, page, per_page, total)

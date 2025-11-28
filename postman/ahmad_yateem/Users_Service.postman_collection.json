@@ -50,11 +50,14 @@
                   "});",
                   "",
                   "const jsonData = pm.response.json();",
-                  "if (jsonData.access_token) {",
-                  "    pm.environment.set('access_token', jsonData.access_token);",
+                  "if (jsonData.data && jsonData.data.tokens && jsonData.data.tokens.access_token) {",
+                  "    pm.environment.set('access_token', jsonData.data.tokens.access_token);",
                   "}",
-                  "if (jsonData.user && jsonData.user.id) {",
-                  "    pm.environment.set('user_id', jsonData.user.id);",
+                  "if (jsonData.data && jsonData.data.tokens && jsonData.data.tokens.refresh_token) {",
+                  "    pm.environment.set('refresh_token', jsonData.data.tokens.refresh_token);",
+                  "}",
+                  "if (jsonData.data && jsonData.data.user && jsonData.data.user.id) {",
+                  "    pm.environment.set('user_id', jsonData.data.user.id);",
                   "}"
                 ]
               }
@@ -70,12 +73,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"ahmadyateem\",\n  \"email\": \"aay123@mail.aub.edu\",\n  \"password\": \"SecurePass@123\",\n  \"name\": \"Ahmad Yateem\",\n  \"role\": \"user\"\n}"
+              "raw": "{\n  \"username\": \"ahmadyateem\",\n  \"email\": \"aay123@mail.aub.edu\",\n  \"password\": \"SecurePass@123\",\n  \"full_name\": \"Ahmad Yateem\",\n  \"role\": \"user\"\n}"
             },
             "url": {
-              "raw": "http://localhost:5001/api/users/register",
+              "raw": "http://localhost:5001/api/auth/register",
               "host": ["http://localhost:5001"],
-              "path": ["api", "users", "register"]
+              "path": ["api", "auth", "register"]
             },
             "description": "**INPUT**: JSON body with username, email, password, name, role\n**PROCESS**: POST request to /api/users/register\n**OUTPUT**: 201 Created with user object and JWT tokens\n\n**Screenshot Caption**: Figure 3: User Registration API Trial - Successful user creation showing input credentials, POST request processing, and 201 response with created user (Ahmad Yateem)"
           },
@@ -162,11 +165,14 @@
                   "});",
                   "",
                   "const jsonData = pm.response.json();",
-                  "if (jsonData.access_token) {",
-                  "    pm.environment.set('access_token', jsonData.access_token);",
+                  "if (jsonData.data && jsonData.data.tokens && jsonData.data.tokens.access_token) {",
+                  "    pm.environment.set('access_token', jsonData.data.tokens.access_token);",
                   "}",
-                  "if (jsonData.refresh_token) {",
-                  "    pm.environment.set('refresh_token', jsonData.refresh_token);",
+                  "if (jsonData.data && jsonData.data.tokens && jsonData.data.tokens.refresh_token) {",
+                  "    pm.environment.set('refresh_token', jsonData.data.tokens.refresh_token);",
+                  "}",
+                  "if (jsonData.data && jsonData.data.user && jsonData.data.user.id) {",
+                  "    pm.environment.set('user_id', jsonData.data.user.id);",
                   "}"
                 ]
               }
@@ -185,9 +191,9 @@
               "raw": "{\n  \"username\": \"ahmadyateem\",\n  \"password\": \"SecurePass@123\"\n}"
             },
             "url": {
-              "raw": "http://localhost:5001/api/users/login",
+              "raw": "http://localhost:5001/api/auth/login",
               "host": ["http://localhost:5001"],
-              "path": ["api", "users", "login"]
+              "path": ["api", "auth", "login"]
             },
             "description": "**INPUT**: Valid username and password\n**PROCESS**: POST request authenticates credentials, generates JWT\n**OUTPUT**: 200 OK with access_token and refresh_token\n\n**Screenshot Caption**: Figure 7: User Login API Trial - Valid credentials input, authentication processing, and JWT tokens returned in response (Ahmad Yateem)"
           },

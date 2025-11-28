@@ -22,6 +22,7 @@ from utils.logger import setup_logger
 
 def create_app():
     app = Flask(__name__)
+    app.url_map.strict_slashes = False
     config = get_config()
     app.config.from_object(config)
     
