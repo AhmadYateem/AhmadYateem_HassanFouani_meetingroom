@@ -1,4 +1,9 @@
-"""Database package exports."""
+"""
+Database package exports.
+
+Authors: Ahmad Yateem, Hassan Fouani
+Module: Database Package
+"""
 
 from database.connection import (
     MySQLConnectionPool,

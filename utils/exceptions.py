@@ -1,5 +1,7 @@
 """
 Custom exception classes for the Smart Meeting Room System.
+
+Author: Ahmad Yateem
 """
 
 

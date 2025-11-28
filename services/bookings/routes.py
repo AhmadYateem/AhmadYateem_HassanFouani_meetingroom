@@ -1,6 +1,8 @@
 """
 Flask routes for Bookings Service.
 Handles all booking-related API endpoints with conflict detection.
+
+Author: Ahmad Yateem
 """
 
 from flask import Blueprint, request, current_app

@@ -1,11 +1,13 @@
 """
 Logging utilities for structured application logging.
+
+Author: Ahmad Yateem
 """
 
 import logging
 import sys
 from pathlib import Path
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.jsonlogger import JsonFormatter
 from configs.config import Config
 
 
@@ -28,7 +30,7 @@ def setup_logger(name: str, log_file: str = None) -> logging.Logger:
     if logger.handlers:
         return logger
 
-    formatter = jsonlogger.JsonFormatter(
+    formatter = JsonFormatter(
         '%(asctime)s %(name)s %(levelname)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )

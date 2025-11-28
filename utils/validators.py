@@ -1,9 +1,11 @@
 """
 Input validation utilities for request data validation.
+
+Author: Ahmad Yateem
 """
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from email_validator import validate_email, EmailNotValidError
 
@@ -45,7 +47,7 @@ def validate_email_format(email: str) -> str:
     """
     try:
         valid = validate_email(email)
-        return valid.email
+        return valid.normalized
     except EmailNotValidError as e:
         raise ValidationError(f"Invalid email format: {str(e)}")
 
@@ -165,7 +167,7 @@ def validate_booking_times(start_time: datetime, end_time: datetime) -> None:
     if start_time >= end_time:
         raise ValidationError("End time must be after start time")
 
-    if start_time < datetime.utcnow():
+    if start_time.replace(tzinfo=None) < datetime.now(timezone.utc).replace(tzinfo=None):
         raise ValidationError("Booking start time cannot be in the past")
 
     duration = end_time - start_time

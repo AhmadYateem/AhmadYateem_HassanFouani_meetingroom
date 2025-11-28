@@ -1,5 +1,7 @@
 """
 Rooms DAO with raw MySQL queries.
+
+Author: Hassan Fouani
 """
 
 import json

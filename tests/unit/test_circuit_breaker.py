@@ -1,6 +1,8 @@
 """
 Unit tests for circuit breaker module.
 Tests circuit breaker states, thresholds, and recovery.
+
+Author: Ahmad Yateem
 """
 
 import pytest

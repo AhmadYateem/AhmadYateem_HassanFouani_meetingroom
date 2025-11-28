@@ -1,6 +1,8 @@
 """
 Data Access Object for Users Service.
 Handles all MySQL database operations using raw SQL queries.
+
+Author: Ahmad Yateem
 """
 
 from datetime import datetime

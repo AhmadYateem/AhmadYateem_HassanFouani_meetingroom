@@ -1,13 +1,19 @@
 """
 Flask routes for the Rooms service using raw MySQL DAO.
+
+Author: Hassan Fouani
 """
 
 from datetime import datetime
 import json
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 from database.connection import MySQLConnectionPool, get_connection
 from services.rooms import dao
+from utils.validators import validate_required_fields, validate_positive_integer, validate_string_length
+from utils.sanitizers import sanitize_string
+from utils.auth import get_current_user, facility_manager_required, admin_required
 
 
 bp = Blueprint("rooms", __name__)
@@ -39,7 +45,7 @@ def list_rooms():
         "building": request.args.get("building"),
         "status": request.args.get("status"),
     }
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         rooms = dao.get_all_rooms(conn, filters)
     return _success(rooms)
@@ -47,7 +53,7 @@ def list_rooms():
 
 @bp.route("/api/rooms/<int:room_id>", methods=["GET"])
 def get_room(room_id: int):
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         room = dao.get_room_by_id(conn, room_id)
     if not room:
@@ -56,30 +62,42 @@ def get_room(room_id: int):
 
 
 @bp.route("/api/rooms", methods=["POST"])
+@jwt_required()
+@facility_manager_required
 def create_room_route():
     data = request.get_json() or {}
     required = ["name", "capacity"]
     for key in required:
         if key not in data:
             return _error(f"Missing required field: {key}", 400)
+    
+    name = sanitize_string(data["name"])
+    if not name or len(name) < 2:
+        return _error("Room name must be at least 2 characters", 400)
+    
+    capacity = data["capacity"]
+    if not isinstance(capacity, int) or capacity < 1:
+        return _error("Capacity must be a positive integer", 400)
 
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         room_id = dao.create_room(
             conn,
-            name=data["name"],
-            capacity=data["capacity"],
+            name=name,
+            capacity=capacity,
             floor=data.get("floor"),
-            building=data.get("building"),
+            building=sanitize_string(data.get("building", "")) if data.get("building") else None,
             equipment=data.get("equipment"),
             amenities=data.get("amenities"),
             hourly_rate=data.get("hourly_rate"),
-            location=data.get("location"),
+            location=sanitize_string(data.get("location", "")) if data.get("location") else None,
         )
     return _success({"id": room_id, "message": "Room created"}, 201)
 
 
 @bp.route("/api/rooms/<int:room_id>", methods=["PUT"])
+@jwt_required()
+@facility_manager_required
 def update_room_route(room_id: int):
     data = request.get_json() or {}
     allowed = {
@@ -93,11 +111,23 @@ def update_room_route(room_id: int):
         "status",
         "hourly_rate",
     }
-    update_data = {k: v for k, v in data.items() if k in allowed}
+    update_data = {}
+    
+    for key in allowed:
+        if key in data:
+            if key in ["name", "building", "location"]:
+                update_data[key] = sanitize_string(data[key]) if data[key] else None
+            elif key == "capacity":
+                if not isinstance(data[key], int) or data[key] < 1:
+                    return _error("Capacity must be a positive integer", 400)
+                update_data[key] = data[key]
+            else:
+                update_data[key] = data[key]
+    
     if not update_data:
         return _error("No valid fields to update", 400)
 
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         updated = dao.update_room(conn, room_id, **update_data)
     if not updated:
@@ -106,8 +136,10 @@ def update_room_route(room_id: int):
 
 
 @bp.route("/api/rooms/<int:room_id>", methods=["DELETE"])
+@jwt_required()
+@facility_manager_required
 def delete_room_route(room_id: int):
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         deleted = dao.delete_room(conn, room_id)
     if not deleted:
@@ -132,7 +164,7 @@ def available_rooms():
     equipment_raw = request.args.get("equipment")
     equipment = [e.strip() for e in equipment_raw.split(",")] if equipment_raw else None
 
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         rooms = dao.get_available_rooms(
             conn,
@@ -154,7 +186,7 @@ def search_rooms_route():
     amenities = data.get("amenities")
     query_text = data.get("query")
 
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         rooms = dao.search_rooms(
             conn,
@@ -169,13 +201,19 @@ def search_rooms_route():
 
 
 @bp.route("/api/rooms/status/<int:room_id>", methods=["PUT"])
+@jwt_required()
+@facility_manager_required
 def update_status(room_id: int):
     data = request.get_json() or {}
     status = data.get("status")
     if not status:
         return _error("Missing status", 400)
+    
+    valid_statuses = ["available", "booked", "maintenance", "out_of_service"]
+    if status not in valid_statuses:
+        return _error(f"Invalid status. Must be one of: {', '.join(valid_statuses)}", 400)
 
-    pool: MySQLConnectionPool = bp.pool  # type: ignore[attr-defined]
+    pool: MySQLConnectionPool = bp.pool
     with get_connection(pool) as conn:
         updated = dao.update_room_status(conn, room_id, status)
     if not updated:

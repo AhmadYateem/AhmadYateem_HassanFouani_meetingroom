@@ -1,5 +1,7 @@
 """
 Reviews DAO with raw MySQL queries.
+
+Author: Hassan Fouani
 """
 
 from typing import Any, Dict, List, Optional, Sequence

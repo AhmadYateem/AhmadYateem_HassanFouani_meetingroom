@@ -1,11 +1,12 @@
 """
 Custom decorators for cross-cutting concerns.
+
+Author: Ahmad Yateem
 """
 
 import time
 from functools import wraps
-from flask import request, g
-from database.models import db, AuditLog
+from flask import request, g, current_app
 from utils.auth import get_current_user
 from utils.logger import setup_logger
 from utils.responses import rate_limit_response
@@ -37,33 +38,35 @@ def audit_log(action: str, resource_type: str = None):
             try:
                 result = fn(*args, **kwargs)
 
-                audit_entry = AuditLog(
-                    user_id=user_id,
-                    service=request.blueprint or 'unknown',
-                    action=action,
-                    resource_type=resource_type,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    success=True
+                logger.info(
+                    f"Audit: {action}",
+                    extra={
+                        'user_id': user_id,
+                        'service': request.blueprint or 'unknown',
+                        'action': action,
+                        'resource_type': resource_type,
+                        'ip_address': ip_address,
+                        'user_agent': user_agent,
+                        'success': True
+                    }
                 )
-                db.session.add(audit_entry)
-                db.session.commit()
 
                 return result
 
             except Exception as e:
-                audit_entry = AuditLog(
-                    user_id=user_id,
-                    service=request.blueprint or 'unknown',
-                    action=action,
-                    resource_type=resource_type,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    success=False,
-                    error_message=str(e)
+                logger.error(
+                    f"Audit: {action} failed",
+                    extra={
+                        'user_id': user_id,
+                        'service': request.blueprint or 'unknown',
+                        'action': action,
+                        'resource_type': resource_type,
+                        'ip_address': ip_address,
+                        'user_agent': user_agent,
+                        'success': False,
+                        'error_message': str(e)
+                    }
                 )
-                db.session.add(audit_entry)
-                db.session.commit()
 
                 raise
 

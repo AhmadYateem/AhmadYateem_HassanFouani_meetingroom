@@ -1,6 +1,8 @@
 """
 Routes for Users Service.
 Handles user authentication and management endpoints.
+
+Author: Ahmad Yateem
 """
 
 from flask import Blueprint, request

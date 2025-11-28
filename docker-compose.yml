@@ -1,0 +1,236 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: smr_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: smartmeetingroom
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: secure_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uadmin", "-psecure_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smr_network
+    command: --default-authentication-plugin=mysql_native_password
+
+  redis:
+    image: redis:7-alpine
+    container_name: smr_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smr_network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: smr_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - smr_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: smr_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - smr_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: smr_grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3000:3000"
+    networks:
+      - smr_network
+    depends_on:
+      - prometheus
+
+  users-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.users
+    container_name: smr_users_service
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=secure_password
+      - MYSQL_DATABASE=smartmeetingroom
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - USER_SERVICE_PORT=5001
+      - FLASK_ENV=development
+    ports:
+      - "5001:5001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/users:/app/services/users
+      - ./database:/app/database
+      - ./utils:/app/utils
+      - ./configs:/app/configs
+      - ./messaging:/app/messaging
+    networks:
+      - smr_network
+    restart: unless-stopped
+
+  rooms-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.rooms
+    container_name: smr_rooms_service
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=secure_password
+      - MYSQL_DATABASE=smartmeetingroom
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ROOM_SERVICE_PORT=5002
+      - FLASK_ENV=development
+    ports:
+      - "5002:5002"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/rooms:/app/services/rooms
+      - ./database:/app/database
+      - ./utils:/app/utils
+      - ./configs:/app/configs
+    networks:
+      - smr_network
+    restart: unless-stopped
+
+  bookings-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bookings
+    container_name: smr_bookings_service
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=secure_password
+      - MYSQL_DATABASE=smartmeetingroom
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - BOOKING_SERVICE_PORT=5003
+      - FLASK_ENV=development
+    ports:
+      - "5003:5003"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./services/bookings:/app/services/bookings
+      - ./database:/app/database
+      - ./utils:/app/utils
+      - ./configs:/app/configs
+      - ./messaging:/app/messaging
+    networks:
+      - smr_network
+    restart: unless-stopped
+
+  reviews-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.reviews
+    container_name: smr_reviews_service
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=secure_password
+      - MYSQL_DATABASE=smartmeetingroom
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REVIEW_SERVICE_PORT=5004
+      - FLASK_ENV=development
+    ports:
+      - "5004:5004"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/reviews:/app/services/reviews
+      - ./database:/app/database
+      - ./utils:/app/utils
+      - ./configs:/app/configs
+    networks:
+      - smr_network
+    restart: unless-stopped
+
+networks:
+  smr_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:

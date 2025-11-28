@@ -1,5 +1,7 @@
 """
 Standardized API response utilities.
+
+Author: Ahmad Yateem
 """
 
 from flask import jsonify

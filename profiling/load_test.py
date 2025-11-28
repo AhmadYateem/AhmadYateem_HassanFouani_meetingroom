@@ -1,6 +1,8 @@
 """
 Lightweight load testing helpers for the Smart Meeting Room Management System.
 
+Author: Hassan Fouani
+
 Features:
 - Concurrent request generation
 - Throughput and latency percentile reporting

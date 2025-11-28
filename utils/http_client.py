@@ -1,6 +1,8 @@
 """
 HTTP client wrapper with circuit breaker integration.
 Provides fault-tolerant inter-service communication.
+
+Author: Ahmad Yateem
 """
 
 import time

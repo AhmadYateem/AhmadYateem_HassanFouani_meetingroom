@@ -1,6 +1,8 @@
 """
 Circuit Breaker pattern implementation for fault-tolerant service communication.
 Provides protection against cascading failures in microservices architecture.
+
+Author: Ahmad Yateem
 """
 
 import threading

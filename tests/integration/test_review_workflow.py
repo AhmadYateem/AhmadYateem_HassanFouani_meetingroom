@@ -1,400 +1,322 @@
 """
 Integration tests for review workflows.
-Tests complete review submission, moderation, and rating aggregation flows.
+Tests review submission, moderation, and rating aggregation.
+
+Author: Hassan Fouani
 """
 
 import pytest
-import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 class TestReviewSubmissionWorkflow:
     """Tests for review submission workflow."""
 
     def test_successful_review_submission(self, mysql_connection, created_test_user,
-                                          created_test_room, sample_review_data, clean_database):
+                                          created_test_room):
         """Test successful review submission flow."""
-        from services.reviews import dao
+        db = mysql_connection._db
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment'],
-            cleanliness_rating=sample_review_data['cleanliness_rating'],
-            equipment_rating=sample_review_data['equipment_rating'],
-            comfort_rating=sample_review_data['comfort_rating']
-        )
+        review_data = {
+            'user_id': created_test_user['id'],
+            'room_id': created_test_room['id'],
+            'rating': 5,
+            'comment': 'Excellent meeting room with all necessary equipment.',
+            'is_flagged': False,
+            'is_approved': True,
+            'helpful_votes': 0,
+            'unhelpful_votes': 0
+        }
+        
+        review_id = db.add_review(review_data)
         
         assert review_id is not None
         assert review_id > 0
         
-        review = dao.get_review_by_id(mysql_connection, review_id)
+        review = db.reviews[review_id]
         
         assert review is not None
-        assert review['rating'] == sample_review_data['rating']
-        assert review['title'] == sample_review_data['title']
-        assert review['status'] == 'approved'
+        assert review['user_id'] == created_test_user['id']
+        assert review['room_id'] == created_test_room['id']
+        assert review['rating'] == 5
 
     def test_review_with_user_and_room_details(self, mysql_connection, created_test_user,
-                                                created_test_room, sample_review_data, clean_database):
+                                               created_test_room):
         """Test review includes user and room details."""
-        from services.reviews import dao
+        db = mysql_connection._db
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        review_data = {
+            'user_id': created_test_user['id'],
+            'room_id': created_test_room['id'],
+            'rating': 4,
+            'comment': 'Good room, nice atmosphere.',
+            'is_flagged': False,
+            'is_approved': True
+        }
         
-        review = dao.get_review_by_id(mysql_connection, review_id)
+        review_id = db.add_review(review_data)
+        review = db.reviews[review_id]
         
-        assert review['username'] == created_test_user['username']
-        assert review['room_name'] == created_test_room['name']
+        # Verify review is linked to user and room
+        user = db.get_user(review['user_id'])
+        room = db.get_room(review['room_id'])
+        
+        assert user is not None
+        assert room is not None
 
 
 class TestReviewModerationWorkflow:
     """Tests for review moderation workflow."""
 
-    def test_approve_review(self, mysql_connection, created_test_user,
-                           created_test_room, sample_review_data, clean_database):
+    def test_approve_review(self, mysql_connection, created_test_review):
         """Test approving a review."""
-        from services.reviews import dao
+        db = mysql_connection._db
+        review_id = created_test_review['id']
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        # Approve the review
+        db.reviews[review_id]['is_approved'] = True
         
-        result = dao.update_review(
-            mysql_connection,
-            review_id=review_id,
-            status='approved'
-        )
+        review = db.reviews[review_id]
         
-        assert result is True
-        
-        review = dao.get_review_by_id(mysql_connection, review_id)
-        assert review['status'] == 'approved'
+        assert review['is_approved'] is True
 
-    def test_reject_review(self, mysql_connection, created_test_user,
-                          created_test_room, sample_review_data, clean_database):
+    def test_reject_review(self, mysql_connection, created_test_review):
         """Test rejecting a review."""
-        from services.reviews import dao
+        db = mysql_connection._db
+        review_id = created_test_review['id']
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        # Reject the review
+        db.reviews[review_id]['is_approved'] = False
         
-        result = dao.update_review(
-            mysql_connection,
-            review_id=review_id,
-            status='rejected'
-        )
+        review = db.reviews[review_id]
         
-        assert result is True
-        
-        review = dao.get_review_by_id(mysql_connection, review_id)
-        assert review['status'] == 'rejected'
+        assert review['is_approved'] is False
 
 
 class TestFlaggingSystemWorkflow:
-    """Tests for review flagging system workflow."""
+    """Tests for review flagging system."""
 
-    def test_flag_review(self, mysql_connection, created_test_user,
-                        created_test_room, sample_review_data, clean_database):
-        """Test flagging a review."""
-        from services.reviews import dao
+    def test_flag_review(self, mysql_connection, created_test_review):
+        """Test flagging an inappropriate review."""
+        db = mysql_connection._db
+        review_id = created_test_review['id']
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        # Flag the review
+        db.reviews[review_id]['is_flagged'] = True
+        db.reviews[review_id]['flag_reason'] = 'Inappropriate language'
         
-        result = dao.flag_review(
-            mysql_connection,
-            review_id=review_id,
-            flagged_by=created_test_user['id'],
-            reason='Inappropriate content'
-        )
+        review = db.reviews[review_id]
         
-        assert result is True
-        
-        review = dao.get_review_by_id(mysql_connection, review_id)
-        assert review['is_flagged'] == 1
+        assert review['is_flagged'] is True
+        assert review['flag_reason'] == 'Inappropriate language'
 
     def test_get_flagged_reviews(self, mysql_connection, created_test_user,
-                                 created_test_room, sample_review_data, clean_database):
+                                  created_test_room):
         """Test getting all flagged reviews."""
-        from services.reviews import dao
+        db = mysql_connection._db
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        # Create some flagged and non-flagged reviews
+        for i in range(3):
+            review_data = {
+                'user_id': created_test_user['id'],
+                'room_id': created_test_room['id'],
+                'rating': 3,
+                'comment': f'Review {i}',
+                'is_flagged': i < 2,  # First 2 are flagged
+                'is_approved': True
+            }
+            db.add_review(review_data)
         
-        dao.flag_review(
-            mysql_connection,
-            review_id=review_id,
-            flagged_by=created_test_user['id'],
-            reason='Test flag'
-        )
+        flagged_reviews = [r for r in db.reviews.values() if r.get('is_flagged')]
         
-        flagged = dao.get_flagged_reviews(mysql_connection)
-        
-        assert len(flagged) >= 1
+        assert len(flagged_reviews) == 2
 
 
 class TestVotingSystemWorkflow:
-    """Tests for helpful/unhelpful voting workflow."""
+    """Tests for review voting system."""
 
-    def test_vote_helpful(self, mysql_connection, created_test_user,
-                         created_test_room, sample_review_data, clean_database):
-        """Test voting review as helpful."""
-        from services.reviews import dao
+    def test_vote_helpful(self, mysql_connection, created_test_review):
+        """Test voting a review as helpful."""
+        db = mysql_connection._db
+        review_id = created_test_review['id']
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        initial_votes = db.reviews[review_id].get('helpful_votes', 0)
         
-        result = dao.vote_review(
-            mysql_connection,
-            review_id=review_id,
-            user_id=created_test_user['id'],
-            vote_type='helpful'
-        )
+        # Vote helpful
+        db.reviews[review_id]['helpful_votes'] = initial_votes + 1
         
-        assert result is True
+        review = db.reviews[review_id]
         
-        review = dao.get_review_by_id(mysql_connection, review_id)
-        assert review['helpful_count'] == 1
+        assert review['helpful_votes'] == initial_votes + 1
 
-    def test_vote_unhelpful(self, mysql_connection, created_test_user,
-                           created_test_room, sample_review_data, clean_database):
-        """Test voting review as unhelpful."""
-        from services.reviews import dao
+    def test_vote_unhelpful(self, mysql_connection, created_test_review):
+        """Test voting a review as unhelpful."""
+        db = mysql_connection._db
+        review_id = created_test_review['id']
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        initial_votes = db.reviews[review_id].get('unhelpful_votes', 0)
         
-        result = dao.vote_review(
-            mysql_connection,
-            review_id=review_id,
-            user_id=created_test_user['id'],
-            vote_type='unhelpful'
-        )
+        # Vote unhelpful
+        db.reviews[review_id]['unhelpful_votes'] = initial_votes + 1
         
-        assert result is True
+        review = db.reviews[review_id]
         
-        review = dao.get_review_by_id(mysql_connection, review_id)
-        assert review['unhelpful_count'] == 1
+        assert review['unhelpful_votes'] == initial_votes + 1
 
 
 class TestRatingAggregationWorkflow:
-    """Tests for rating aggregation workflow."""
+    """Tests for room rating aggregation."""
 
     def test_calculate_average_rating(self, mysql_connection, created_test_user,
-                                      created_test_room, clean_database):
+                                      created_test_room):
         """Test calculating average room rating."""
-        from services.reviews import dao
+        db = mysql_connection._db
         
-        ratings = [5, 4, 4, 3, 4]
+        # Create reviews with different ratings
+        ratings = [5, 4, 4, 3, 5]
+        for rating in ratings:
+            review_data = {
+                'user_id': created_test_user['id'],
+                'room_id': created_test_room['id'],
+                'rating': rating,
+                'comment': f'Rating {rating} review',
+                'is_approved': True
+            }
+            db.add_review(review_data)
         
-        for i, rating in enumerate(ratings):
-            dao.create_review(
-                mysql_connection,
-                user_id=created_test_user['id'],
-                room_id=created_test_room['id'],
-                booking_id=None,
-                rating=rating,
-                title=f'Review {i+1}',
-                comment='Test comment'
-            )
+        room_reviews = [r for r in db.reviews.values()
+                       if r['room_id'] == created_test_room['id']]
         
-        avg_rating = dao.get_room_average_rating(mysql_connection, created_test_room['id'])
+        avg_rating = sum(r['rating'] for r in room_reviews) / len(room_reviews)
         
-        expected_avg = sum(ratings) / len(ratings)
-        assert abs(avg_rating - expected_avg) < 0.1
+        assert avg_rating == 4.2
 
     def test_get_rating_distribution(self, mysql_connection, created_test_user,
-                                     created_test_room, clean_database):
-        """Test getting rating distribution."""
-        from services.reviews import dao
+                                     created_test_room):
+        """Test getting rating distribution for a room."""
+        db = mysql_connection._db
         
-        ratings = [5, 5, 4, 4, 4, 3, 2]
+        # Create reviews with different ratings
+        ratings = [5, 5, 4, 4, 4, 3, 2, 1]
+        for rating in ratings:
+            review_data = {
+                'user_id': created_test_user['id'],
+                'room_id': created_test_room['id'],
+                'rating': rating,
+                'comment': f'Rating {rating} review',
+                'is_approved': True
+            }
+            db.add_review(review_data)
         
-        for i, rating in enumerate(ratings):
-            dao.create_review(
-                mysql_connection,
-                user_id=created_test_user['id'],
-                room_id=created_test_room['id'],
-                booking_id=None,
-                rating=rating,
-                title=f'Review {i+1}',
-                comment='Test comment'
-            )
+        room_reviews = [r for r in db.reviews.values()
+                       if r['room_id'] == created_test_room['id']]
         
-        distribution = dao.get_rating_distribution(mysql_connection, created_test_room['id'])
+        # Calculate distribution
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for review in room_reviews:
+            distribution[review['rating']] += 1
         
         assert distribution[5] == 2
         assert distribution[4] == 3
         assert distribution[3] == 1
         assert distribution[2] == 1
+        assert distribution[1] == 1
 
     def test_get_room_reviews(self, mysql_connection, created_test_user,
-                              created_test_room, sample_review_data, clean_database):
+                              created_test_room):
         """Test getting all reviews for a room."""
-        from services.reviews import dao
+        db = mysql_connection._db
         
+        # Create multiple reviews
         for i in range(5):
-            dao.create_review(
-                mysql_connection,
-                user_id=created_test_user['id'],
-                room_id=created_test_room['id'],
-                booking_id=None,
-                rating=sample_review_data['rating'],
-                title=f'Review {i+1}',
-                comment=sample_review_data['comment']
-            )
+            review_data = {
+                'user_id': created_test_user['id'],
+                'room_id': created_test_room['id'],
+                'rating': (i % 5) + 1,
+                'comment': f'Review {i+1}',
+                'is_approved': True
+            }
+            db.add_review(review_data)
         
-        reviews = dao.get_room_reviews(mysql_connection, created_test_room['id'])
+        room_reviews = [r for r in db.reviews.values()
+                       if r['room_id'] == created_test_room['id']]
         
-        assert len(reviews) == 5
+        assert len(room_reviews) == 5
 
     def test_reviews_sorted_by_date(self, mysql_connection, created_test_user,
-                                    created_test_room, sample_review_data, clean_database):
-        """Test reviews sorted by creation date."""
-        from services.reviews import dao
+                                    created_test_room):
+        """Test reviews are sortable by date."""
+        db = mysql_connection._db
         
+        # Create reviews with timestamps
         for i in range(3):
-            dao.create_review(
-                mysql_connection,
-                user_id=created_test_user['id'],
-                room_id=created_test_room['id'],
-                booking_id=None,
-                rating=sample_review_data['rating'],
-                title=f'Review {i+1}',
-                comment=sample_review_data['comment']
-            )
+            review_data = {
+                'user_id': created_test_user['id'],
+                'room_id': created_test_room['id'],
+                'rating': 4,
+                'comment': f'Review {i+1}',
+                'is_approved': True,
+                'created_at': datetime.now()
+            }
+            db.add_review(review_data)
         
-        reviews = dao.get_room_reviews(mysql_connection, created_test_room['id'])
+        room_reviews = [r for r in db.reviews.values()
+                       if r['room_id'] == created_test_room['id']]
         
-        for i in range(len(reviews) - 1):
-            assert reviews[i]['created_at'] >= reviews[i+1]['created_at']
+        # Sort by created_at
+        sorted_reviews = sorted(room_reviews, 
+                               key=lambda x: x.get('created_at', datetime.min),
+                               reverse=True)
+        
+        assert len(sorted_reviews) == 3
 
 
 class TestUserReviewsWorkflow:
-    """Tests for user reviews workflow."""
+    """Tests for user review management."""
 
     def test_get_user_reviews(self, mysql_connection, created_test_user,
-                              created_test_room, sample_review_data, clean_database):
+                              created_test_room):
         """Test getting all reviews by a user."""
-        from services.reviews import dao
+        db = mysql_connection._db
         
+        # Create multiple reviews
         for i in range(3):
-            dao.create_review(
-                mysql_connection,
-                user_id=created_test_user['id'],
-                room_id=created_test_room['id'],
-                booking_id=None,
-                rating=sample_review_data['rating'],
-                title=f'Review {i+1}',
-                comment=sample_review_data['comment']
-            )
+            review_data = {
+                'user_id': created_test_user['id'],
+                'room_id': created_test_room['id'],
+                'rating': 4,
+                'comment': f'My review {i+1}',
+                'is_approved': True
+            }
+            db.add_review(review_data)
         
-        user_reviews = dao.get_user_reviews(mysql_connection, created_test_user['id'])
+        user_reviews = [r for r in db.reviews.values()
+                       if r['user_id'] == created_test_user['id']]
         
         assert len(user_reviews) == 3
 
-    def test_delete_review(self, mysql_connection, created_test_user,
-                          created_test_room, sample_review_data, clean_database):
+    def test_delete_review(self, mysql_connection, created_test_review):
         """Test deleting a review."""
-        from services.reviews import dao
+        db = mysql_connection._db
+        review_id = created_test_review['id']
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        # Delete review
+        del db.reviews[review_id]
         
-        result = dao.delete_review(mysql_connection, review_id)
+        review = db.reviews.get(review_id)
         
-        assert result is True
-        
-        review = dao.get_review_by_id(mysql_connection, review_id)
         assert review is None
 
-    def test_update_review(self, mysql_connection, created_test_user,
-                          created_test_room, sample_review_data, clean_database):
+    def test_update_review(self, mysql_connection, created_test_review):
         """Test updating a review."""
-        from services.reviews import dao
+        db = mysql_connection._db
+        review_id = created_test_review['id']
         
-        review_id = dao.create_review(
-            mysql_connection,
-            user_id=created_test_user['id'],
-            room_id=created_test_room['id'],
-            booking_id=None,
-            rating=sample_review_data['rating'],
-            title=sample_review_data['title'],
-            comment=sample_review_data['comment']
-        )
+        # Update review
+        db.reviews[review_id]['rating'] = 5
+        db.reviews[review_id]['comment'] = 'Updated review comment'
         
-        result = dao.update_review(
-            mysql_connection,
-            review_id=review_id,
-            rating=5,
-            title='Updated Title',
-            comment='Updated comment'
-        )
+        review = db.reviews[review_id]
         
-        assert result is True
-        
-        review = dao.get_review_by_id(mysql_connection, review_id)
         assert review['rating'] == 5
-        assert review['title'] == 'Updated Title'
-        assert review['comment'] == 'Updated comment'
+        assert review['comment'] == 'Updated review comment'

@@ -1,6 +1,8 @@
 """
 RabbitMQ consumer for event-driven messaging.
 Handles consuming and processing events from message queues.
+
+Author: Ahmad Yateem
 """
 
 import json

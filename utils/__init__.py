@@ -25,9 +25,9 @@ from utils.logger import setup_logger, app_logger
 from utils.exceptions import *
 from utils.responses import *
 from utils.decorators import *
-from utils.circuit_breaker import CircuitBreaker, get_circuit_breaker, with_circuit_breaker
+from utils.circuit_breaker import CircuitBreaker, get_circuit_breaker, circuit_breaker
 from utils.cache import cache, cached, invalidate_cache
-from utils.http_client import ServiceClient, ServiceClients
+from utils.http_client import ServiceClient, HTTPClient
 
 __all__ = [
     'hash_password',

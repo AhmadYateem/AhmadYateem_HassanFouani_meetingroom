@@ -1,6 +1,8 @@
 """
 Flask application for Bookings Service.
 Handles booking management with conflict detection.
+
+Author: Ahmad Yateem
 """
 
 from flask import Flask, jsonify

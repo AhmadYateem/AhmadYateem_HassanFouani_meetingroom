@@ -1,5 +1,8 @@
 """
 Database initialization helpers for applying the MySQL schema.
+
+Author: Ahmad Yateem
+Module: Database Initialization
 """
 
 from pathlib import Path

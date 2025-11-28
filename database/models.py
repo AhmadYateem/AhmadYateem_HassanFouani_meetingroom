@@ -1,6 +1,9 @@
 """
 Lightweight data access layer using mysql-connector.
 Provides dataclass representations and helper functions for common queries.
+
+Author: Ahmad Yateem
+Module: Database Models and Data Access Layer
 """
 
 from __future__ import annotations
@@ -139,7 +142,7 @@ class AuditLog:
         return AuditLog(**data)
 
 
-# --- User queries ---
+# --- User queries (Author: Ahmad Yateem) ---
 
 def create_user(pool: MySQLConnectionPool, user: User) -> int:
     query = """
@@ -177,7 +180,7 @@ def get_user_by_email(pool: MySQLConnectionPool, email: str) -> Optional[User]:
     return result
 
 
-# --- Room queries ---
+# --- Room queries (Author: Hassan Fouani) ---
 
 def list_rooms(pool: MySQLConnectionPool, status: Optional[str] = None) -> List[Room]:
     query = "SELECT * FROM rooms"
@@ -220,7 +223,7 @@ def create_room(pool: MySQLConnectionPool, room: Room) -> int:
     return room_id
 
 
-# --- Booking queries ---
+# --- Booking queries (Author: Ahmad Yateem) ---
 
 def check_booking_conflict(
     pool: MySQLConnectionPool,
@@ -284,7 +287,7 @@ def create_booking(pool: MySQLConnectionPool, booking: Booking) -> int:
     return booking_id
 
 
-# --- Review queries ---
+# --- Review queries (Author: Hassan Fouani) ---
 
 def create_review(pool: MySQLConnectionPool, review: Review) -> int:
     query = """
@@ -322,7 +325,7 @@ def create_review(pool: MySQLConnectionPool, review: Review) -> int:
     return review_id
 
 
-# --- Audit log queries ---
+# --- Audit log queries 
 
 def add_audit_log(pool: MySQLConnectionPool, log: AuditLog) -> int:
     query = """

@@ -1,6 +1,8 @@
 """
 RabbitMQ publisher for event-driven messaging.
 Handles publishing events to message queues.
+
+Author: Ahmad Yateem
 """
 
 import json

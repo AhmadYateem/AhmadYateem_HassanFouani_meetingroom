@@ -1,5 +1,8 @@
 """
 MySQL connection utilities with pooled connections.
+
+Author: Ahmad Yateem
+Module: Database Connection Management
 """
 
 import os
@@ -47,21 +50,21 @@ def _load_env_value(key: str, default: Optional[str] = None) -> str:
     return value
 
 
-def create_pool_from_env(prefix: str = "DATABASE") -> MySQLConnectionPool:
+def create_pool_from_env(prefix: str = "MYSQL") -> MySQLConnectionPool:
     """
     Build a MySQL connection pool using environment variables.
 
     Args:
-        prefix: Environment variable prefix
+        prefix: Environment variable prefix (default: MYSQL)
 
     Returns:
         MySQLConnectionPool instance
     """
-    host = _load_env_value(f"{prefix}_HOST")
+    host = _load_env_value(f"{prefix}_HOST", "localhost")
     port = int(_load_env_value(f"{prefix}_PORT", "3306"))
-    user = _load_env_value(f"{prefix}_USER")
-    password = _load_env_value(f"{prefix}_PASSWORD")
-    database = _load_env_value(f"{prefix}_NAME")
+    user = _load_env_value(f"{prefix}_USER", "root")
+    password = _load_env_value(f"{prefix}_PASSWORD", "password")
+    database = _load_env_value(f"{prefix}_DATABASE", "smartmeetingroom")
     pool_size = int(os.getenv(f"{prefix}_POOL_SIZE", "5"))
 
     return MySQLConnectionPool(

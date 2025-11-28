@@ -1,5 +1,7 @@
 """
 Input sanitization utilities for SQL injection and XSS prevention.
+
+Author: Ahmad Yateem
 """
 
 import re

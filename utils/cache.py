@@ -1,5 +1,7 @@
 """
 Redis caching utilities for the Smart Meeting Room system.
+
+Author: Hassan Fouani
 """
 
 import json

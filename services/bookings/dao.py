@@ -1,6 +1,8 @@
 """
 Data Access Object for Bookings Service.
 Handles all MySQL database operations with conflict detection.
+
+Author: Ahmad Yateem
 """
 
 from datetime import datetime, timedelta
