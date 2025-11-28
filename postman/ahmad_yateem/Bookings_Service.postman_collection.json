@@ -1,0 +1,481 @@
+{
+  "info": {
+    "name": "Ahmad Yateem - Bookings Service",
+    "_postman_id": "ahmad-bookings-service",
+    "description": "Complete Bookings Service API collection by Ahmad Yateem. Includes booking management, conflict detection, availability checks, and error cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "0. Health & Advanced Features",
+      "item": [
+        {
+          "name": "0.1 Bookings Service Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5003/health",
+              "host": ["http://localhost:5003"],
+              "path": ["health"]
+            },
+            "description": "**INPUT**: None (no authentication required)\n**PROCESS**: GET request to health endpoint\n**OUTPUT**: 200 OK with service status\n\n**Screenshot Caption**: Figure 17: Bookings Service Health Check - GET request showing service is healthy (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "0.2 Get Availability Matrix",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/availability-matrix?room_id=1&date=2025-11-29",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "availability-matrix"],
+              "query": [
+                {
+                  "key": "room_id",
+                  "value": "1"
+                },
+                {
+                  "key": "date",
+                  "value": "2025-11-29"
+                }
+              ]
+            },
+            "description": "**INPUT**: Room ID and date as query parameters\n**PROCESS**: GET request calculates hourly availability matrix\n**OUTPUT**: 200 OK with hourly availability slots\n\n**Screenshot Caption**: Figure 18: Availability Matrix API - Hourly breakdown of room availability (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "0.3 Create Recurring Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 1,\n  \"title\": \"Weekly EECE435L Team Meeting\",\n  \"description\": \"Weekly project sync with Hassan\",\n  \"start_time\": \"2025-12-01T10:00:00\",\n  \"end_time\": \"2025-12-01T11:00:00\",\n  \"attendees\": 5,\n  \"pattern\": \"weekly\",\n  \"end_date\": \"2025-12-31T11:00:00\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/recurring",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "recurring"]
+            },
+            "description": "**INPUT**: Booking details + pattern (daily/weekly/monthly) + end_date\n**PROCESS**: POST request creates multiple recurring bookings\n**OUTPUT**: 201 Created with list of booking IDs\n\n**Screenshot Caption**: Figure 19: Recurring Bookings API - Creating weekly recurring meetings (Ahmad Yateem)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Booking Management",
+      "item": [
+        {
+          "name": "1.1 Create Booking (Success)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.booking && jsonData.booking.id) {",
+                  "    pm.environment.set('booking_id', jsonData.booking.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 1,\n  \"start_time\": \"2025-11-29T09:00:00\",\n  \"end_time\": \"2025-11-29T10:00:00\",\n  \"title\": \"EECE435L Project Meeting\",\n  \"description\": \"Meeting with Hassan to discuss final project deliverables\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", ""]
+            },
+            "description": "**INPUT**: Room ID, start/end times, title, description in JSON body\n**PROCESS**: POST request creates booking with conflict checking\n**OUTPUT**: 201 Created with booking object\n\n**Screenshot Caption**: Figure 17: Create Booking API Trial - Room and time slot input, POST request processing, and confirmed booking returned (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Create Booking (Time Conflict)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 1,\n  \"start_time\": \"2025-11-29T09:00:00\",\n  \"end_time\": \"2025-11-29T10:00:00\",\n  \"title\": \"Another EECE Meeting\",\n  \"description\": \"This should fail due to time conflict\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", ""]
+            },
+            "description": "**INPUT**: Same room and time slot as existing booking\n**PROCESS**: POST request detects scheduling conflict\n**OUTPUT**: 409 Conflict with error message\n\n**Screenshot Caption**: Figure 18: Booking Conflict Detection - Overlapping time slot rejected with 409 conflict error demonstrating scheduling validation (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Create Booking (Invalid Time - End Before Start)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 1,\n  \"start_time\": \"2025-11-29T15:00:00\",\n  \"end_time\": \"2025-11-29T14:00:00\",\n  \"title\": \"Software Tools Study Session\",\n  \"description\": \"End time is before start time - invalid\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", ""]
+            },
+            "description": "**INPUT**: End time (14:00) before start time (15:00)\n**PROCESS**: POST request triggers time validation\n**OUTPUT**: 400 Bad Request with validation error\n\n**Screenshot Caption**: Figure 19: Booking Time Validation - End time before start time rejected with 400 error (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.4 Create Booking (Unauthorized - No Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 1,\n  \"start_time\": \"2025-11-30T09:00:00\",\n  \"end_time\": \"2025-11-30T10:00:00\",\n  \"title\": \"Unauthorized Study Group\",\n  \"description\": \"No token provided - should fail\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", ""]
+            },
+            "description": "**INPUT**: Booking data but NO Authorization header\n**PROCESS**: POST request without authentication\n**OUTPUT**: 401 Unauthorized\n\n**Screenshot Caption**: Figure 20: Unauthorized Booking Attempt - Request without JWT rejected with 401 (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.5 Get All Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", ""]
+            },
+            "description": "**INPUT**: JWT token in Authorization header\n**PROCESS**: GET request retrieves all bookings\n**OUTPUT**: 200 OK with paginated list of bookings\n\n**Screenshot Caption**: Figure 21: Get All Bookings API Trial - Authenticated GET request and paginated list of all bookings returned (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.6 Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/{{booking_id}}",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "{{booking_id}}"]
+            },
+            "description": "**INPUT**: Booking ID in URL path + JWT token\n**PROCESS**: GET request retrieves specific booking\n**OUTPUT**: 200 OK with booking details\n\n**Screenshot Caption**: Figure 22: Get Booking by ID API Trial - Booking ID in URL path, authenticated request, and booking details returned (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.7 Get Booking (Not Found)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/99999",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "99999"]
+            },
+            "description": "**INPUT**: Non-existent booking ID (99999)\n**PROCESS**: GET request for missing resource\n**OUTPUT**: 404 Not Found\n\n**Screenshot Caption**: Figure 23: Booking Not Found - Request for non-existent booking returns 404 (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.8 Update Booking",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_time\": \"2025-11-29T14:00:00\",\n  \"end_time\": \"2025-11-29T15:00:00\",\n  \"title\": \"EECE435L Project Meeting - Rescheduled\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/{{booking_id}}",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "{{booking_id}}"]
+            },
+            "description": "**INPUT**: New time slot and title in JSON body\n**PROCESS**: PUT request updates booking with conflict check\n**OUTPUT**: 200 OK with updated booking\n\n**Screenshot Caption**: Figure 24: Update Booking API Trial - New time slot input, PUT request with booking ID, and updated booking returned (Ahmad Yateem)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Availability & Cancellation",
+      "item": [
+        {
+          "name": "2.1 Check Room Availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/availability?room_id=1&date=2025-11-29",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "availability"],
+              "query": [
+                {
+                  "key": "room_id",
+                  "value": "1"
+                },
+                {
+                  "key": "date",
+                  "value": "2025-11-29"
+                }
+              ]
+            },
+            "description": "**INPUT**: room_id and date as query parameters\n**PROCESS**: GET request calculates available time slots\n**OUTPUT**: 200 OK with available and booked slots\n\n**Screenshot Caption**: Figure 25: Room Availability API Trial - Room ID and date as query parameters, GET request, and available time slots returned (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Check Availability (POST method)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 1,\n  \"start_time\": \"2025-11-29T16:00:00\",\n  \"end_time\": \"2025-11-29T17:00:00\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/check-availability",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "check-availability"]
+            },
+            "description": "**INPUT**: Room ID and time range in JSON body\n**PROCESS**: POST request checks if specific slot is available\n**OUTPUT**: 200 OK with availability status\n\n**Screenshot Caption**: Figure 26: Availability Check API - Specific time slot availability verification (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "2.3 Get User's Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/user/{{user_id}}",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "user", "{{user_id}}"]
+            },
+            "description": "**INPUT**: User ID in URL + JWT token\n**PROCESS**: GET request retrieves user's bookings\n**OUTPUT**: 200 OK with list of user's bookings\n\n**Screenshot Caption**: Figure 27: User's Bookings - Retrieving all bookings for specific user (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "2.4 Create Booking for Cancellation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.booking && jsonData.booking.id) {",
+                  "    pm.environment.set('cancel_booking_id', jsonData.booking.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": 1,\n  \"start_time\": \"2025-12-01T09:00:00\",\n  \"end_time\": \"2025-12-01T10:00:00\",\n  \"title\": \"AUB Study Session - To Cancel\",\n  \"description\": \"This booking will be cancelled for demo\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", ""]
+            },
+            "description": "**Setup step**: Create a booking to be cancelled in next test"
+          },
+          "response": []
+        },
+        {
+          "name": "2.5 Cancel Booking",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/{{cancel_booking_id}}",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "{{cancel_booking_id}}"]
+            },
+            "description": "**INPUT**: Booking ID in URL + JWT token\n**PROCESS**: DELETE request cancels the booking\n**OUTPUT**: 200 OK with cancellation confirmation\n\n**Screenshot Caption**: Figure 28: Cancel Booking API Trial - Booking ID in URL, DELETE request, and cancellation confirmation returned (Ahmad Yateem)"
+          },
+          "response": []
+        },
+        {
+          "name": "2.6 Get Booking Conflicts (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5003/api/bookings/conflicts",
+              "host": ["http://localhost:5003"],
+              "path": ["api", "bookings", "conflicts"]
+            },
+            "description": "**INPUT**: Admin JWT token\n**PROCESS**: GET request retrieves all conflicting bookings\n**OUTPUT**: 200 OK with list of conflicts\n\n**Screenshot Caption**: Figure 29: Booking Conflicts API - Admin view of all scheduling conflicts (Ahmad Yateem)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "booking_id",
+      "value": ""
+    },
+    {
+      "key": "cancel_booking_id",
+      "value": ""
+    },
+    {
+      "key": "user_id",
+      "value": ""
+    }
+  ]
+}
