@@ -30,6 +30,41 @@ def health():
     return _success({"status": "healthy", "service": "reviews"})
 
 
+@bp.route("/api/reviews", methods=["GET"])
+@jwt_required()
+def get_all_reviews():
+    """Get all reviews with optional pagination and filtering."""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    room_id = request.args.get("room_id", type=int)
+    
+    pool: MySQLConnectionPool = bp.pool
+    with get_connection(pool) as conn:
+        if room_id:
+            reviews = dao.get_room_reviews(conn, room_id, include_hidden=False)
+        else:
+            # Get all reviews from the database
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT r.*, u.username, u.full_name
+                FROM reviews r
+                LEFT JOIN users u ON r.user_id = u.id
+                WHERE r.is_hidden = FALSE
+                ORDER BY r.created_at DESC
+                LIMIT %s OFFSET %s
+            """, (per_page, (page - 1) * per_page))
+            reviews = cursor.fetchall()
+            cursor.close()
+    
+    return _success({
+        "data": reviews,
+        "pagination": {
+            "page": page,
+            "per_page": per_page
+        }
+    })
+
+
 @bp.route("/api/reviews", methods=["POST"])
 @jwt_required()
 def create_review_route():

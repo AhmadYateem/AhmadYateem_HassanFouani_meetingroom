@@ -1,0 +1,298 @@
+{
+  "info": {
+    "name": "Hassan Fouani - Rooms Service (FIXED)",
+    "_postman_id": "hassan-rooms-fixed",
+    "description": "Rooms Service API - FULLY HARDCODED. No environment needed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Setup - Login First",
+      "item": [
+        {
+          "name": "0.1 Login Admin (RUN THIS FIRST)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.tokens) {",
+                  "    pm.collectionVariables.set('token', jsonData.data.tokens.access_token);",
+                  "    pm.collectionVariables.set('user_id', jsonData.data.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"adminuser\",\n  \"password\": \"SecurePass@123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5001/api/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5001",
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Health Check",
+      "item": [
+        {
+          "name": "1.1 Rooms Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5002/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Room Management",
+      "item": [
+        {
+          "name": "2.1 Create Room",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('room_id', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Conference Room A\",\n  \"capacity\": 20,\n  \"floor\": 3,\n  \"building\": \"Main Building\",\n  \"amenities\": [\"projector\", \"whiteboard\", \"video_conferencing\"],\n  \"description\": \"Large conference room with modern facilities\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5002/api/rooms",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Get All Rooms",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5002/api/rooms?page=1&per_page=20",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.3 Get Room by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5002/api/rooms/{{room_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms", "{{room_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.4 Update Room",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Conference Room A - Updated\",\n  \"capacity\": 25,\n  \"description\": \"Updated large conference room\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5002/api/rooms/{{room_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms", "{{room_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.5 Update Room Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"maintenance\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5002/api/rooms/status/{{room_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms", "status", "{{room_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.6 Check Room Availability",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5002/api/rooms/{{room_id}}/availability?date=2025-12-01",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms", "{{room_id}}", "availability"],
+              "query": [
+                { "key": "date", "value": "2025-12-01" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.7 Filter Rooms by Capacity",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5002/api/rooms?min_capacity=10&max_capacity=30",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms"],
+              "query": [
+                { "key": "min_capacity", "value": "10" },
+                { "key": "max_capacity", "value": "30" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.8 Filter Rooms by Building",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5002/api/rooms?building=Main Building",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms"],
+              "query": [
+                { "key": "building", "value": "Main Building" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.9 Delete Room",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5002/api/rooms/{{room_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5002",
+              "path": ["api", "rooms", "{{room_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "token", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc2NDM2MzAzOSwianRpIjoiYjJlOTg5YTMtNDA5OS00NDVjLWExNWItODEzZGFkNDE2M2UyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IjkiLCJuYmYiOjE3NjQzNjMwMzksImNzcmYiOiIwYmU2ZWI0YS1lYWQxLTRjM2ItODk5MS1hMmNiMTM5M2Q4ZmUiLCJleHAiOjE3NjQzNjY2MzksInVzZXJfaWQiOjksInVzZXJuYW1lIjoiYWRtaW51c2VyIiwicm9sZSI6ImFkbWluIn0.C2UBSLRIyRKbDzDyeT3HIfiSr1YRR7vxme0Frwp_25U" },
+    { "key": "user_id", "value": "9" },
+    { "key": "room_id", "value": "1" }
+  ]
+}

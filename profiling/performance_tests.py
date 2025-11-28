@@ -1,7 +1,7 @@
 """
 Performance profiling for the Smart Meeting Room Management System.
 
-Author: Hassan Fouani
+Author: Hassan Fouani, Ahmad Yateem
 
 Includes:
 - Database benchmarks
